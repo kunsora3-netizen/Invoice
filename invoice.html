@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#222222">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="インボイス電卓">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>インボイス電卓</title>
+
+<style>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+body{
+  background:#f5f5f5;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  max-width:500px;
+  margin:auto;
+  padding:12px;
+}
+
+.header{
+  text-align:center;
+  font-size:24px;
+  font-weight:bold;
+  margin-bottom:12px;
+}
+
+.display{
+  background:#fff;
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+
+.amount{
+  text-align:right;
+  font-size:42px;
+  font-weight:bold;
+  min-height:50px;
+}
+
+.mode{
+  display:flex;
+  gap:8px;
+  margin-top:15px;
+}
+
+.mode button{
+  flex:1;
+  border:none;
+  border-radius:12px;
+  padding:14px;
+  font-size:16px;
+}
+
+.active{
+  background:#222;
+  color:#fff;
+}
+
+.inactive{
+  background:#ddd;
+}
+
+.card{
+  background:#fff;
+  border-radius:16px;
+  padding:15px;
+  margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+
+.table{
+  width:100%;
+}
+
+.row{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  padding:8px 0;
+  border-bottom:1px solid #eee;
+  text-align:right;
+}
+
+.row:last-child{
+  border-bottom:none;
+}
+
+.row div:first-child{
+  text-align:left;
+  font-weight:bold;
+}
+
+.header-row{
+  font-weight:bold;
+  font-size:18px;
+}
+
+.invoice-title{
+  text-align:center;
+  color:#666;
+  margin-bottom:8px;
+}
+
+.invoice-no{
+  text-align:center;
+  font-size:20px;
+  font-weight:bold;
+}
+
+.keypad{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+
+.key{
+  border:none;
+  border-radius:16px;
+  height:68px;
+  background:#fff;
+  font-size:24px;
+  font-weight:bold;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+
+.key:active{
+  transform:scale(.97);
+}
+
+.clear{
+  grid-column:span 3;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+インボイス電卓
+</div>
+
+<div class="display">
+
+<div class="amount" id="amountDisplay">
+0
+</div>
+
+<div class="mode">
+
+<button
+id="inclusiveBtn"
+class="active"
+onclick="setMode('inclusive')">
+税込
+</button>
+
+<button
+id="exclusiveBtn"
+class="inactive"
+onclick="setMode('exclusive')">
+税抜
+</button>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="table">
+
+<div class="row header-row">
+<div>項目</div>
+<div>10%</div>
+<div>8%</div>
+</div>
+
+<div class="row">
+<div>税抜</div>
+<div id="base10">0</div>
+<div id="base8">0</div>
+</div>
+
+<div class="row">
+<div>税額</div>
+<div id="tax10">0</div>
+<div id="tax8">0</div>
+</div>
+
+<div class="row">
+<div>税込</div>
+<div id="total10">0</div>
+<div id="total8">0</div>
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+<div class="invoice-title">
+事業者番号
+</div>
+
+<div class="invoice-no">
+T1234567890123
+</div>
+</div>
+
+<div class="keypad">
+
+<button class="key" onclick="addNum('7')">7</button>
+<button class="key" onclick="addNum('8')">8</button>
+<button class="key" onclick="addNum('9')">9</button>
+
+<button class="key" onclick="addNum('4')">4</button>
+<button class="key" onclick="addNum('5')">5</button>
+<button class="key" onclick="addNum('6')">6</button>
+
+<button class="key" onclick="addNum('1')">1</button>
+<button class="key" onclick="addNum('2')">2</button>
+<button class="key" onclick="addNum('3')">3</button>
+
+<button class="key" onclick="addNum('00')">00</button>
+<button class="key" onclick="addNum('0')">0</button>
+<button class="key" onclick="backspace()">←</button>
+
+<button class="key clear" onclick="clearAll()">C</button>
+
+</div>
+
+<script>
+
+let amount = "";
+let mode = "inclusive";
+
+const amountDisplay = document.getElementById("amountDisplay");
+
+const base10 = document.getElementById("base10");
+const tax10 = document.getElementById("tax10");
+const total10 = document.getElementById("total10");
+
+const base8 = document.getElementById("base8");
+const tax8 = document.getElementById("tax8");
+const total8 = document.getElementById("total8");
+
+const inclusiveBtn = document.getElementById("inclusiveBtn");
+const exclusiveBtn = document.getElementById("exclusiveBtn");
+
+function yen(v){
+  return Number(v).toLocaleString("ja-JP");
+}
+
+function setMode(m){
+
+  mode = m;
+
+  inclusiveBtn.className =
+    m === "inclusive"
+    ? "active"
+    : "inactive";
+
+  exclusiveBtn.className =
+    m === "exclusive"
+    ? "active"
+    : "inactive";
+
+  calculate();
+}
+
+function addNum(num){
+
+  if(amount === "0"){
+    amount = "";
+  }
+
+  amount += num;
+
+  calculate();
+}
+
+function backspace(){
+
+  amount = amount.slice(0,-1);
+
+  calculate();
+}
+
+function clearAll(){
+
+  amount = "";
+
+  calculate();
+}
+
+function calculate(){
+
+  const val =
+    Number(amount || 0);
+
+  amountDisplay.textContent =
+    yen(val);
+
+  if(mode === "inclusive"){
+
+    const t10 =
+      Math.floor(val * 10 / 110);
+
+    const b10 =
+      val - t10;
+
+    const t8 =
+      Math.floor(val * 8 / 108);
+
+    const b8 =
+      val - t8;
+
+    base10.textContent = yen(b10);
+    tax10.textContent = yen(t10);
+    total10.textContent = yen(val);
+
+    base8.textContent = yen(b8);
+    tax8.textContent = yen(t8);
+    total8.textContent = yen(val);
+
+  }else{
+
+    const t10 =
+      Math.floor(val * 0.10);
+
+    const sum10 =
+      val + t10;
+
+    const t8 =
+      Math.floor(val * 0.08);
+
+    const sum8 =
+      val + t8;
+
+    base10.textContent = yen(val);
+    tax10.textContent = yen(t10);
+    total10.textContent = yen(sum10);
+
+    base8.textContent = yen(val);
+    tax8.textContent = yen(t8);
+    total8.textContent = yen(sum8);
+
+  }
+
+}
+
+calculate();
+
+</script>
+<script>
+if("serviceWorker" in navigator){
+
+  navigator.serviceWorker
+    .register("./service-worker.js")
+    .then(() => {
+      console.log("PWA OK");
+    });
+
+}
+</script>
+</body>
+</html>
